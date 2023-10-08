@@ -1,0 +1,50 @@
+version: "3.8"
+
+services:
+  todotelegrambot:
+    image: todotelegrambot
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: ["pwd"]
+    volumes:
+      - ./app.py:/app/app.py
+      - ./.env:/app/.env
+
+  webserver:
+    image: nginx:latest
+    ports:
+      - 80:80
+      - 443:443
+    restart: always
+    volumes:
+      - ./nginx/conf/:/etc/nginx/conf.d/:ro
+      - ./certbot/www/:/etc/nginx/html/:ro
+      - ./certbot/www:/var/www/certbot/:ro
+      - ./certbot/conf/:/etc/nginx/ssl/:ro
+    depends_on:
+      - todotelegrambot
+  certbot:
+    image: certbot/certbot:latest
+    command: certonly --webroot --email yellow444@gmail.com --webroot-path /var/www/certbot/ --non-interactive --agree-tos -d broadband-188-255-24-92.ip.moscow.rt.ru
+    volumes:
+      - ./certbot/www/:/var/www/certbot/:rw
+      - ./certbot/conf/:/etc/letsencrypt/:rw
+
+# --dry-run
+
+# mongodb:
+#    image: mongo:latest
+#    container_name: "mongodb"
+#    restart: always
+#    logging:
+#      driver: "none"
+#    command: mongod --auth
+#    environment:
+#      MONGO_INITDB_ROOT_USERNAME: root
+#      MONGO_INITDB_ROOT_PASSWORD: password123
+#      MONGO_INITDB_DATABASE: admin
+#      MONDODB_LOG_DIR: /dev/null
+#    volumes:
+#      - ./mongo-data:/data/db
+
