@@ -13,4 +13,4 @@ replit.nix
 poetry.lock
 **/node_modules
 **/dist/**
-mongo-data
+/mongo-data/**
