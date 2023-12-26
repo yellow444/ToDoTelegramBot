@@ -11,7 +11,7 @@ services:
       - ./app.py:/app/app.py
       - ./.env:/app/.env
     depends_on:
-      - webserver
+      - mongodb
   # webserver:
   #   image: nginx:latest
   #   ports:
