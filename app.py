@@ -24,17 +24,6 @@ from telegram.ext import (Application, CallbackContext, CallbackQueryHandler,
                           CommandHandler, ContextTypes, MessageHandler,
                           Updater, filters)
 
-# Provide the connection details
-hostname = os.getenv('mongodb')
-# hostname = '127.0.0.1'
-port = 27017  # Default MongoDB port
-username = os.getenv('root')  # If authentication is required
-password = os.getenv('password123')  # If authentication is required
-
-# Create a MongoClient instance
-client = MongoClient(hostname, port, username=username, password=password)
-db = client[os.getenv('teleg')]
-collection = db[os.getenv('msg')]
 tg_app = None
 # BOT_TOKEN = '6531252215:AAFu4lIS43TwjEDJ7Y65EIrUt3PNKqLtiCw'
 data_chat_id = None
@@ -66,7 +55,17 @@ routes = [
 ]
 
 app = FastAPI(routes=routes)
+# Provide the connection details
+hostname = os.getenv('mongodb')
+# hostname = '127.0.0.1'
+port = 27017  # Default MongoDB port
+username = os.getenv('root')  # If authentication is required
+password = os.getenv('password123')  # If authentication is required
 
+# Create a MongoClient instance
+client = MongoClient(hostname, port, username=username, password=password)
+db = client[os.getenv('teleg')]
+collection = db[os.getenv('msg')]
 TOKEN = os.getenv('BOT_TOKEN')  # bot token. Append /test to use test servers.
 HOSTNAME = os.getenv('MYHOSTNAME')  # HTTP(S) URL for WebAppInfo
 PORT = 80
