@@ -1,16 +1,14 @@
 #!/home/hoppingturtles/.pyenv/shims/python
 import asyncio
-import calendar
 import datetime
 import json
 import logging
 import os
-import traceback
 from pathlib import Path
 from urllib.parse import quote
 
 import uvicorn
-from dateutil.relativedelta import *
+from dateutil.relativedelta import relativedelta
 from dotenv import find_dotenv, load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
@@ -19,10 +17,9 @@ from pymongo import MongoClient
 from starlette.routing import Mount
 from telegram import (InlineKeyboardButton, InlineKeyboardMarkup,
                       KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove,
-                      Update, WebAppInfo)
-from telegram.ext import (Application, CallbackContext, CallbackQueryHandler,
-                          CommandHandler, ContextTypes, MessageHandler,
-                          Updater, filters)
+                      Update)
+from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
+                          ContextTypes, MessageHandler, filters)
 
 tg_app = None
 # BOT_TOKEN = '6531252215:AAFu4lIS43TwjEDJ7Y65EIrUt3PNKqLtiCw'
@@ -450,6 +447,16 @@ async def pop_task():
                         {"message_id": rec['message_id']},
                         {"$set": {"message_id": new_rec.message_id, 'date': (datetime.datetime.now() + relativedelta(minutes=10)).strftime('%Y-%m-%dT%H:%M:%S.%fZ')}})                   
                     elif date < datetime.datetime.now():
+                        collection.delete_many({"message_id": rec['message_id']})
+        except Exception as e:
+            pass
+
+
+if __name__ == "__main__":
+    loop = asyncio.get_event_loop()
+    cors = asyncio.wait([ pop_task(),main()])
+    loop.run_until_complete(cors)
+    # asyncio.run(main())
                         collection.delete_many({"message_id": rec['message_id']})
         except Exception as e:
             pass

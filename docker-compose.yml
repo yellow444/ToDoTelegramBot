@@ -1,72 +1,62 @@
 version: "3.8"
 
 services:
-  todotelegrambot:
-    image: todotelegrambot
-    build:
-      context: .
-      dockerfile: ./Dockerfile
-    command: ["pwd"]
-    volumes:
-      - ./app.py:/app/app.py
-      - ./.env:/app/.env
-    depends_on:
-      - mongodb
-  # webserver:
-  #   image: nginx:latest
-  #   ports:
-  #     - 80:80
-  #     - 443:443
-  #   restart: always
+  # todotelegrambot:
+  #   image: todotelegrambot
+  #   build:
+  #     context: .
+  #     dockerfile: ./Dockerfile
+  #   command: ["pwd"]
   #   volumes:
-  #     - ./nginx/conf/:/etc/nginx/conf.d/:ro
-  #     # - datawww:/etc/nginx/html/:ro
-  #     - ./certbot/www/:/etc/nginx/html/:ro
-  #     # - datawww:/var/www/certbot:ro
-  #     - ./certbot/www:/var/www/certbot/:ro      
-  #     # - datassl:/etc/nginx/ssl:ro
-  #     - ./certbot/conf/:/etc/nginx/ssl/:ro
+  #     - ./app.py:/app/app.py
+  #     - ./.env:/app/.env
   #   depends_on:
-  #     - certbot
-  # certbot:
-  #   image: certbot/certbot:latest
-  #   command: certonly --webroot --email yellow444@gmail.com --webroot-path /var/www/certbot/ --non-interactive --agree-tos -d broadband-188-255-24-92.ip.moscow.rt.ru 
-  #   volumes:
-  #     # - datawww:/var/www/certbot:rw
-  #     - ./certbot/www/:/var/www/certbot/:rw
-  #     # - datassl:/etc/letsencrypt/:rw
-  #     - ./certbot/conf/:/etc/letsencrypt/:rw
-
-# --dry-run
-
-  mongodb:
-    image: mongo:latest
-    container_name: "mongodb"
+  #     - mongodb
+  webservercert:
+    image: nginx:latest
+    ports:
+      - 80:80
     restart: always
-    # logging:
-    #   driver: "none"
-    command: mongod --auth
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: password123
-      MONGO_INITDB_DATABASE: admin
-      # MONDODB_LOG_DIR: /dev/null
     volumes:
-      - ./mongo-data:/data/db
-    # ports:
-    #   - 27017:27017
+      - ./nginxcert/conf/:/etc/nginx/conf.d/:rw
+      - ./certbot/www/:/etc/nginx/html/:ro
+      - ./certbot/www:/var/www/certbot/:ro
+      - ./certbot/conf/:/etc/nginx/ssl/:ro
+  webserver:
+    image: nginx:latest
+    ports:
+      - 443:443
+    restart: always
+    volumes:
+      - ./nginx/conf/:/etc/nginx/conf.d/:rw
+      - ./certbot/conf/:/etc/nginx/ssl/:ro
+      - ./datawww/:/etc/nginx/html/
+  certbot:
+    image: certbot/certbot:latest
+    command: certonly --webroot --email yellow444@gmail.com --webroot-path /var/www/certbot/ --non-interactive --agree-tos -d broadband-188-255-24-92.ip.moscow.rt.ru  
+    # --dry-run
+    volumes:
+      # - datawww:/var/www/certbot:rw
+      - ./certbot/www/:/var/www/certbot/:rw
+      # - datassl:/etc/letsencrypt/:rw
+      - ./certbot/conf/:/etc/letsencrypt/:rw
+    # depends_on:
+    #   - webservercert    
+    # --dry-run
 
-# volumes:
-#   datassl:
-#     driver: local
-#     driver_opts:
-#       type: "tmpfs"
-#       device: "tmpfs"
-#       o: "size=256m,uid=1000"
-#   datawww:
-#     driver: local
-#     driver_opts:
-#       type: "tmpfs"
-#       device: "tmpfs"
-#       o: "size=256m,uid=1000"
-    # external: true
+    # mongodb:
+    #   image: mongo:latest
+    #   container_name: "mongodb"
+    #   restart: always
+    #   # logging:
+    #   #   driver: "none"
+    #   command: mongod --auth
+    #   environment:
+    #     MONGO_INITDB_ROOT_USERNAME: root
+    #     MONGO_INITDB_ROOT_PASSWORD: password123
+    #     MONGO_INITDB_DATABASE: admin
+    #     # MONDODB_LOG_DIR: /dev/null
+    #   volumes:
+    #     - ./mongo-data:/data/db
+    #   # ports:
+    #   #   - 27017:27017
