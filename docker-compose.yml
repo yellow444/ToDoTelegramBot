@@ -33,30 +33,20 @@ services:
       - ./datawww/:/etc/nginx/html/
   certbot:
     image: certbot/certbot:latest
-    command: certonly --webroot --email yellow444@gmail.com --webroot-path /var/www/certbot/ --non-interactive --agree-tos -d broadband-188-255-24-92.ip.moscow.rt.ru  
+    command: certonly --webroot --email yellow444@gmail.com --webroot-path /var/www/certbot/ --non-interactive --agree-tos -d broadband-188-255-24-92.ip.moscow.rt.ru
     # --dry-run
     volumes:
-      # - datawww:/var/www/certbot:rw
       - ./certbot/www/:/var/www/certbot/:rw
-      # - datassl:/etc/letsencrypt/:rw
       - ./certbot/conf/:/etc/letsencrypt/:rw
-    # depends_on:
-    #   - webservercert    
-    # --dry-run
 
-    # mongodb:
-    #   image: mongo:latest
-    #   container_name: "mongodb"
-    #   restart: always
-    #   # logging:
-    #   #   driver: "none"
-    #   command: mongod --auth
-    #   environment:
-    #     MONGO_INITDB_ROOT_USERNAME: root
-    #     MONGO_INITDB_ROOT_PASSWORD: password123
-    #     MONGO_INITDB_DATABASE: admin
-    #     # MONDODB_LOG_DIR: /dev/null
-    #   volumes:
-    #     - ./mongo-data:/data/db
-    #   # ports:
-    #   #   - 27017:27017
+  mongodb:
+    image: mongo:latest
+    container_name: "mongodb"
+    restart: always
+    command: mongod --auth
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: admin
+    volumes:
+      - ./mongo-data:/data/db
