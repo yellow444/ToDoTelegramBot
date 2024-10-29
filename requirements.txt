@@ -1,4 +1,6 @@
 anyio==4.0.0
+APScheduler==3.10.4
+backports.zoneinfo==0.2.1
 certifi==2023.7.22
 click==8.1.7
 colorama==0.4.6
@@ -24,4 +26,5 @@ starlette==0.22.0
 tornado==6.4.1
 typing_extensions==4.12.2
 tzdata==2024.2
+tzlocal==5.2
 uvicorn==0.20.0

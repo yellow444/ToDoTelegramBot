@@ -37,7 +37,7 @@ def create_calendar(cur=None):
     if cur == None:
         cur = now
     data_ignore = create_callback_data(
-        "IGNORE", cur.year, cur.month, cur.day, cur.hour, cur.minute
+        "IGNORE", cur.year, cur.month, 0, cur.hour, cur.minute
     )
     keyboard = []
     row = []
@@ -77,7 +77,7 @@ def create_calendar(cur=None):
                     InlineKeyboardButton(
                         str(day),
                         callback_data=create_callback_data(
-                            "DAY", cur.year, cur.month, cur.day, cur.hour, cur.minute
+                            "DAY", cur.year, cur.month, day, cur.hour, cur.minute
                         ),
                     )
                 )
