@@ -14,3 +14,9 @@ python-telegram-bot==20.5
 sniffio==1.3.0
 python-dateutil==2.8.2
 pymongo==4.6.1
+convert-numbers
+# pandas
+# shutil
+# pydantic
+python-dateutil
+# openpyxl

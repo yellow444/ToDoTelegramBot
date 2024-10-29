@@ -3,17 +3,30 @@ import asyncio
 import datetime
 import json
 import logging
+import os
 from pathlib import Path
 
 import uvicorn
 from dateutil.relativedelta import relativedelta
+from dotenv import find_dotenv, load_dotenv
 from fastapi import FastAPI, Request
-from pydantic import BaseModel, BaseSettings
 from pymongo import MongoClient
-from telegram import (InlineKeyboardButton, InlineKeyboardMarkup,
-                      ReplyKeyboardRemove, Update)
-from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
-                          ContextTypes, MessageHandler, filters)
+from telegram import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
+    Update,
+)
+from telegram.ext import (
+    Application,
+    CallbackQueryHandler,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
 
 import messages
 import telegramcalendar
@@ -21,6 +34,11 @@ import utils
 
 tg_app = None
 
+data_chat_id = None
+data_inline_message_id = None
+data_message_id = None
+bot_chat_id = None
+bot_message_id = None
 bot_message_text = None
 bot_message_caption = None
 all_keyboards = []
@@ -39,71 +57,46 @@ g_months = {
     11: "November",
     12: "December",
 }
+cur_date = datetime.datetime.now()
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
+
 logger = logging.getLogger(__name__)
 
+load_dotenv(find_dotenv())
 
-class Settings(BaseSettings):
-    MONGO_HOST: str
-    MONGO_PORT: int
-    MONGO_USER: str
-    MONGO_PASS: str
-    DB_NAME: str
-    COLLECTION_NAME: str
-    TOKEN: str
-    MYHOSTNAME: str
-    PORT: str
-
-    class Config:
-        env_file = ".env"
-
-
-config = Settings()
 
 app = FastAPI()
 
-MONGO_HOST = config.MONGO_HOST
-MONGO_PORT = config.MONGO_PORT
-MONGO_USER = config.MONGO_USER
-MONGO_PASS = config.MONGO_PASS
+hostname = "mongodb"
+
+port = 27017
+username = "root"
+password = "password123"
+
+
 client = None
 db = None
 collection = None
 try:
     client = MongoClient(
-        MONGO_HOST,
-        MONGO_PORT,
-        username=MONGO_USER,
-        password=MONGO_PASS,
+        hostname,
+        port,
+        username=username,
+        password=password,
         serverSelectionTimeoutMS=3000,
     )
-    try:
-        client.server_info()
-    except Exception as e:
-        print(e)
-        client = MongoClient(
-            "127.0.0.1",
-            MONGO_PORT,
-            username=MONGO_USER,
-            password=MONGO_PASS,
-            serverSelectionTimeoutMS=3000,
-        )
-        client.server_info()
-    db = client[config.DB_NAME]
-    collection = db[config.COLLECTION_NAME]
+    client.server_info()
+    db = client["teleg"]
+    collection = db["msg"]
 except Exception as e:
     print(e)
     client = None
-TOKEN = config.TOKEN
-HOSTNAME = config.MYHOSTNAME
+TOKEN = os.getenv("BOT_TOKEN")
+HOSTNAME = os.getenv("MYHOSTNAME")
 PORT = 80
-
-
-class HealthCheck(BaseModel):
-    status: str = "OK"
 
 
 @app.get("/")
@@ -111,64 +104,27 @@ async def web_html(request: Request):
     print("web_html")
 
 
-@app.get("/hc")
-async def hc(request: Request):
-    print("hc")
-    return HealthCheck(status="OK")
-
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update if update.callback_query is None else update.callback_query
-    bot = query.get_bot()
-    chat_id = context._chat_id
-    msg_text = r"_It is not the message you are looking for\.\.\._"
-    await bot.send_message(
-        chat_id,
-        msg_text,
-        reply_markup=ReplyKeyboardRemove(),
-        parse_mode="MarkdownV2",
-    )
     print("start")
 
 
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    global user_states
-    query = update if update.callback_query is None else update.callback_query
-    bot = update.get_bot()
-    user_id = (
-        query.from_user.id
-        if query.message is not None and query.message.from_user.id == bot.id
-        else query.message.from_user.id
-    )
-    bot_message_id = query.message._id_attrs[0]
+    global \
+        bot_message_id, \
+        bot_message_text, \
+        bot_message_caption, \
+        data_chat_id, \
+        data_message_id
+    query = update.callback_query
+    bot_message_id = query.message.message_id
     bot_message_text = query.message.text
-    if user_id not in user_states:
-        user_states[user_id] = {}
+    bot_message_caption = query.message.caption
 
-    user_states[user_id]["data_chat_id"] = query.message.chat.id
-    user_states[user_id]["bot_message_caption"] = query.message.caption
-
-    message_text = query.message.text if query.message else ""
-    if message_text == messages.calendar_message or (
-        user_id in user_states
-        and "data_message_id" in user_states[user_id]
-        and bot_message_id == user_states[user_id]["data_message_id"]
-    ):
+    bot = query.get_bot()
+    message_text = update.message.text if update.message else ""
+    if message_text == "Please select a date: " or bot_message_id == data_message_id:
         await inline_handler(update, context)
-        return
-    try:
-        await context.bot.delete_message(
-            user_states[user_id]["data_chat_id"],
-            user_states[user_id]["data_message_id"],
-        )
-    except Exception as e:
-        print(e)
-        pass
-    finally:
-        user_states[user_id] = {}
 
-    user_states[user_id]["bot_message_id"] = bot_message_id
-    user_states[user_id]["bot_message_text"] = bot_message_text
     if query.message.text is not None:
         source = query.message.text.replace("~~", "")
     else:
@@ -176,18 +132,22 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     reply_markup = None
     text = None
     if query.data in "date":
+        try:
+            await context.bot.delete_message(data_chat_id, data_message_id)
+        except Exception as e:
+            print(e)
+            pass
+        finally:
+            data_chat_id = None
+            data_message_id = None
         await calendar_handler(update, context)
         return
-
     if query.data in "del":
         if collection is not None:
             collection.delete_many({"message_id": query.message.message_id})
-        try:
-            await bot.delete_message(
-                chat_id=query.message.chat.id, message_id=query.message.message_id
-            )
-        except Exception as e:
-            print(e)
+        await bot.delete_message(
+            chat_id=query.message.chat_id, message_id=query.message.message_id
+        )
         return
     if query.data in "done":
         text = f"✅ {source}" if source else "✅"
@@ -217,61 +177,62 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if text != query.message.text:
         if query.message.text is not None:
             await bot.editMessageText(
-                chat_id=query.message.chat.id,
+                chat_id=query.message.chat_id,
                 message_id=query.message.message_id,
                 text=text,
                 reply_markup=reply_markup,
             )
         else:
             await bot.editMessageCaption(
-                chat_id=query.message.chat.id,
+                chat_id=query.message.chat_id,
                 message_id=query.message.message_id,
                 caption=text,
                 reply_markup=reply_markup,
             )
 
 
-async def selectDate(update, context, date):
-    global user_states
+async def selectDate(update, context):
+    global cur_date, data_chat_id, data_message_id, bot_message_id, bot_message_caption
     try:
         query = update if update.callback_query is None else update.callback_query
     except Exception as e:
         print(e)
         pass
-    bot = update.get_bot()
+    bot = context.bot
     user_id = (
         query.from_user.id
         if query.message is not None and query.message.from_user.id == bot.id
         else query.message.from_user.id
     )
-    bot_message_id = query.message._id_attrs[0]
     print("selected")
-    _chat_id = query.message.chat.id
+    date = cur_date
+    _chat_id = context._chat_id
     if collection is not None:
         if db.mycollections.count_documents({"message_id": bot_message_id}) == 0:
-            today = " :" + datetime.datetime.today().strftime("%d-%m-%Y %H:%M")
+            today = " :" + datetime.datetime.today().strftime("%d-%m-%Y %H:%M:%S")
             collection.insert_one(
                 {
                     "chat_id": _chat_id,
                     "message_id": bot_message_id,
                     "message": bot_message_text,
                     "caption": bot_message_caption,
-                    "date": (user_states[user_id]["date"]).strftime("%d-%m-%Y %H:%M"),
+                    "date": (date).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                     "today": today,
                 }
             )
         else:
             collection.find_one_and_update(
                 {"message_id": bot_message_id},
-                {
-                    "$set": {
-                        "date": (user_states[user_id]["date"]).strftime(
-                            "%d-%m-%Y %H:%M"
-                        )
-                    }
-                },
+                {"$set": {"date": (date).strftime("%Y-%m-%dT%H:%M:%S.%fZ")}},
             )
-    bot_message_text = user_states[user_id]["bot_message_text"]
+    try:
+        await context.bot.delete_message(data_chat_id, data_message_id)
+    except Exception as e:
+        print(e)
+        pass
+    finally:
+        data_chat_id = None
+        data_message_id = None
     text = (
         None
         if not bot_message_text
@@ -279,7 +240,6 @@ async def selectDate(update, context, date):
         if bot_message_text.startswith("✅")
         else bot_message_text
     )
-    text = text.split(" ::")[0] + " ::" + (date.strftime("%d-%m-%Y %H:%M"))
     keyboard = [
         [
             InlineKeyboardButton("✔️ Выполнить", callback_data="done"),
@@ -295,35 +255,60 @@ async def selectDate(update, context, date):
             text=text,
             reply_markup=reply_markup,
         )
+    del user_states[user_id]
     return
-
-
-async def remove_calendar_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print("")
 
 
 async def handle_datepicker_input(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
     try:
-        global user_states
-        query = update if update.callback_query is None else update.callback_query
-        bot = update.get_bot()
+        global \
+            cur_date, \
+            data_chat_id, \
+            data_message_id, \
+            bot_message_id, \
+            bot_message_caption
         user_id = update.message.from_user.id
-        text = update.message.text
-        if text is None or text.isspace() or messages.calendar_message in text:
-            try:
-                await bot.delete_message(
-                    chat_id=query.message.chat.id,
-                    message_id=query.message.message_id,
-                )
-            except Exception as e:
-                print(e)
-            finally:
-                user_states[user_id] = {}
+        if user_id not in user_states or user_states[user_id] != "waiting_for_date":
+            await echo(update, context)
+            return
+        selected_date = update.message.text
+        if "now" in selected_date:
+            cur_date = datetime.datetime.now()
+        elif "select" in selected_date:
+            await selectDate(update, context)
+        elif "day-" in selected_date:
+            cur_date = cur_date + relativedelta(days=-1)
+        elif "day+" in selected_date:
+            cur_date = cur_date + relativedelta(days=+1)
+        elif "year-" in selected_date:
+            cur_date = cur_date + relativedelta(years=-1)
+        elif "year+" in selected_date:
+            cur_date = cur_date + relativedelta(years=+1)
+        elif "month-" in selected_date:
+            cur_date = cur_date + relativedelta(months=-1)
+        elif "month+" in selected_date:
+            cur_date = cur_date + relativedelta(months=+1)
+        elif "hour-" in selected_date:
+            cur_date = cur_date + relativedelta(hours=-1)
+        elif "hour+" in selected_date:
+            cur_date = cur_date + relativedelta(hours=+1)
+        elif "min-" in selected_date:
+            cur_date = cur_date + relativedelta(minutes=-1)
+        elif "min+" in selected_date:
+            cur_date = cur_date + relativedelta(minutes=+1)
         else:
             await echo(update, context)
-
+        try:
+            await context.bot.delete_message(data_chat_id, data_message_id)
+        except Exception as e:
+            print(e)
+            pass
+        finally:
+            data_chat_id = None
+            data_message_id = None
+        await _datepicker(update, context)
     except Exception as e:
         print(e)
         pass
@@ -335,26 +320,17 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    global user_states
-    query = update if update.callback_query is None else update.callback_query
-    bot = update.get_bot()
-    user_id = (
-        query.from_user.id
-        if query.message is not None and query.message.from_user.id == bot.id
-        else query.message.from_user.id
-    )
+    global bot_message_id, bot_message_text, data_chat_id, data_message_id
     try:
-        await context.bot.delete_message(
-            user_states[user_id]["data_chat_id"],
-            user_states[user_id]["data_message_id"],
-        )
+        await context.bot.delete_message(data_chat_id, data_message_id)
     except Exception as e:
         print(e)
         pass
     finally:
-        user_states[user_id] = {}
+        data_chat_id = None
+        data_message_id = None
+    bot = update.get_bot()
     first = None
-    second = None
     if update.message.video is not None:
         first = await update.message.reply_video(
             video=update.message.video, caption=update.message.caption
@@ -367,6 +343,8 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         first = await update.message.reply_document(
             document=update.message.document, caption=update.message.caption
         )
+    elif update.message.text is not None:
+        first = await update.message.reply_text(update.message.text)
     elif update.message.sticker is not None:
         first = await update.message.reply_sticker(
             sticker=update.message.sticker, caption=update.message.caption
@@ -388,7 +366,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             venue=update.message.venue, caption=update.message.caption
         )
     else:
-        first = await update.message.reply_text(update.message.text)
+        return
     keyboard = [
         [
             InlineKeyboardButton("✔️ Выполнить", callback_data="done"),
@@ -397,77 +375,130 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    today = " ::" + datetime.datetime.today().strftime("%d-%m-%Y %H:%M")
+    today = " :" + datetime.datetime.today().strftime("%d-%m-%Y %H:%M:%S")
     if update.message.video is not None:
-        second = await bot.editMessageCaption(
+        await bot.editMessageCaption(
             chat_id=first.chat_id,
             message_id=first.message_id,
             caption=first.caption + today,
             reply_markup=reply_markup,
         )
     elif update.message.audio is not None:
-        second = await bot.editMessageCaption(
+        await bot.editMessageCaption(
             chat_id=first.chat_id,
             message_id=first.message_id,
             caption=first.caption + today,
             reply_markup=reply_markup,
         )
     elif update.message.document is not None:
-        second = await bot.editMessageCaption(
+        await bot.editMessageCaption(
             chat_id=first.chat_id,
             message_id=first.message_id,
             caption=first.caption + today,
             reply_markup=reply_markup,
         )
-
+    elif update.message.text is not None:
+        await bot.editMessageText(
+            chat_id=first.chat_id,
+            message_id=first.message_id,
+            text=first.text + today,
+            reply_markup=reply_markup,
+        )
     elif update.message.sticker is not None:
-        second = await bot.editMessageCaption(
+        await bot.editMessageCaption(
             chat_id=first.chat_id,
             message_id=first.message_id,
             caption=first.caption + today,
             reply_markup=reply_markup,
         )
     elif update.message.voice is not None:
-        second = await bot.editMessageCaption(
+        await bot.editMessageCaption(
             chat_id=first.chat_id,
             message_id=first.message_id,
             caption=first.caption + today,
             reply_markup=reply_markup,
         )
     elif update.message.location is not None:
-        second = await bot.editMessageCaption(
+        await bot.editMessageCaption(
             chat_id=first.chat_id,
             message_id=first.message_id,
             caption=first.caption + today,
             reply_markup=reply_markup,
         )
     elif update.message.contact is not None:
-        second = await bot.editMessageCaption(
+        await bot.editMessageCaption(
             chat_id=first.chat_id,
             message_id=first.message_id,
             caption=first.caption + today,
             reply_markup=reply_markup,
         )
     elif update.message.venue is not None:
-        second = await bot.editMessageCaption(
+        await bot.editMessageCaption(
             chat_id=first.chat_id,
             message_id=first.message_id,
             caption=first.caption + today,
             reply_markup=reply_markup,
         )
-    else:
-        second = await bot.editMessageText(
-            chat_id=first.chat_id,
-            message_id=first.message_id,
-            text=first.text + today,
-            reply_markup=reply_markup,
-        )
-    print(second)
+
     await update.message.delete()
 
 
+async def datepicker(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    global cur_date
+    user_id = None
+    try:
+        user_id = update.callback_query.message.from_user.id
+    except Exception as e:
+        print(e)
+        pass
+    if user_id in user_states and user_states[user_id] == "waiting_for_date":
+        await _datepicker(update, context)
+        return handle_datepicker_input(update, context)
+    cur_date = datetime.datetime.now()
+    await _datepicker(update, context)
+
+
+def generate_datepicker_keyboard(date: datetime.datetime) -> list:
+    global g_months, all_keyboards
+    all_keyboards = all_keyboards.clear()
+    years_row = [
+        KeyboardButton("year-"),
+        KeyboardButton("cancel"),
+        KeyboardButton("year+"),
+    ]
+    month_row = [
+        KeyboardButton("month-"),
+        KeyboardButton("day-"),
+        KeyboardButton("now"),
+        KeyboardButton("day+"),
+        KeyboardButton("month+"),
+    ]
+    hour_row = [
+        KeyboardButton("hour-"),
+        KeyboardButton("min-"),
+        KeyboardButton("min+"),
+        KeyboardButton("hour+"),
+    ]
+    select_row = [KeyboardButton(f"select:{date.strftime('%d.%m.%Y %H:%M')}")]
+    keyboard = []
+    keyboard.append(years_row)
+    keyboard.append(month_row)
+    keyboard.append(hour_row)
+    keyboard.append(select_row)
+    all_keyboards = keyboard
+    return keyboard
+
+
 async def calendar_handler(update, context):
-    global user_states
+    global data_chat_id, data_message_id, cur_date, bot_chat_id, bot_message_id
+    try:
+        await context.bot.delete_message(data_chat_id, data_message_id)
+    except Exception as e:
+        print(e)
+        pass
+    finally:
+        data_chat_id = None
+        data_message_id = None
     try:
         query = update if update.callback_query is None else update.callback_query
         bot = update.get_bot()
@@ -477,13 +508,74 @@ async def calendar_handler(update, context):
             else query.message.from_user.id
         )
         msg = await bot.send_message(
-            chat_id=query.message.chat.id,
+            chat_id=query.message.chat_id,
             text=messages.calendar_message,
             reply_markup=telegramcalendar.create_calendar(),
         )
-        user_states[user_id]["data_chat_id"] = msg.chat_id
-        user_states[user_id]["data_message_id"] = msg._id_attrs[0]
-        user_states[user_id]["waiting_for_date"] = messages.calendar_message
+        data_chat_id = msg.chat_id
+        data_message_id = msg._id_attrs[0]
+        user_states[user_id] = "waiting_for_date"
+    except Exception as e:
+        print(e)
+        pass
+
+
+async def _datepicker(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    global data_chat_id, data_message_id, cur_date, bot_chat_id, bot_message_id
+    bot = update.get_bot()
+    try:
+        await context.bot.delete_message(data_chat_id, data_message_id)
+    except Exception as e:
+        print(e)
+        pass
+    finally:
+        data_chat_id = None
+        data_message_id = None
+    user_id = None
+    try:
+        query = update if update.callback_query is None else update.callback_query
+    except Exception as e:
+        print(e)
+        pass
+    user_id = (
+        query.from_user.id
+        if query.message is not None and query.message.from_user.id == bot.id
+        else query.message.from_user.id
+    )
+    date = cur_date
+    keyboard = generate_datepicker_keyboard(date)
+    reply_markup = ReplyKeyboardMarkup(
+        keyboard, resize_keyboard=True, one_time_keyboard=True
+    )
+    msg = await bot.send_message(
+        chat_id=query.message.chat_id, text="datepicker", reply_markup=reply_markup
+    )
+    data_chat_id = msg.chat_id
+    data_message_id = msg._id_attrs[0]
+    user_states[user_id] = "waiting_for_date"
+
+
+async def _updatedatepicker(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    global \
+        data_chat_id, \
+        data_inline_message_id, \
+        data_message_id, \
+        cur_date, \
+        bot_chat_id, \
+        bot_message_id
+    bot = context.bot
+    date = cur_date
+    keyboard = generate_datepicker_keyboard(date)
+    reply_markup = ReplyKeyboardMarkup(
+        keyboard, resize_keyboard=True, one_time_keyboard=True
+    )
+    try:
+        await bot.edit_message_text(
+            chat_id=data_chat_id,
+            message_id=data_message_id,
+            text="datepicker",
+            reply_markup=reply_markup,
+        )
     except Exception as e:
         print(e)
         pass
@@ -498,25 +590,21 @@ async def received_data(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         dates.append(datetime_obj)
     print(dates)
     bot = update.get_bot()
-    query = update if update.callback_query is None else update.callback_query
-    try:
-        await bot.delete_message(
-            chat_id=query.message.chat.id, message_id=query.message.message_id
-        )
-    except Exception as e:
-        print(e)
-
+    query = update.callback_query
+    await bot.delete_message(
+        chat_id=query.message.chat_id, message_id=query.message.message_id
+    )
     reply_markup = query.message.reply_markup
     if query.message.text is not None:
         await bot.editMessageText(
-            chat_id=query.message.chat.id,
+            chat_id=query.message.chat_id,
             message_id=query.message.message_id,
             text=f"{query.message.text} Напомнить:{dates}",
             reply_markup=reply_markup,
         )
     else:
         await bot.editMessageCaption(
-            chat_id=query.message.chat.id,
+            chat_id=query.message.chat_id,
             message_id=query.message.message_id,
             caption=f"{query.message.caption} Напомнить:{dates}",
             reply_markup=reply_markup,
@@ -536,135 +624,33 @@ async def remove_chat_buttons(bot, chat_id):
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     print("stop")
-    query = update if update.callback_query is None else update.callback_query
+    query = update.callback_query
     bot = query.get_bot()
     chat_id = context._chat_id
-    await remove_chat_buttons(bot, chat_id)
+    remove_chat_buttons(bot, chat_id)
 
 
 async def inline_handler(update, context):
-    query = update if update.callback_query is None else update.callback_query
-    (kind, _, _, _, _, _, _) = utils.separate_callback_data(query.data)
+    query = update.callback_query
+    (kind, _, _, _, _) = utils.separate_callback_data(query.data)
     await inline_calendar_handler(update, context)
 
 
 async def inline_calendar_handler(update, context):
-    global user_states
-    query = update if update.callback_query is None else update.callback_query
-    bot = update.get_bot()
-    user_id = (
-        query.from_user.id
-        if query.message is not None and query.message.from_user.id == bot.id
-        else query.message.from_user.id
-    )
+    global data_chat_id, data_message_id, cur_date
     selected, date = await telegramcalendar.process_calendar_selection(update, context)
     if selected:
-        user_states[user_id]["date"] = date
-
-        print(date.strftime("%d-%m-%Y %H:%M"))
+        cur_date = date
+        print(date.strftime("%d/%m/%Y"))
+        await selectDate(update, context)
         try:
-            await context.bot.delete_message(
-                user_states[user_id]["data_chat_id"],
-                user_states[user_id]["data_message_id"],
-            )
-
-            text = (
-                user_states[user_id]["bot_message_text"].split(" ::")[0]
-                + " ::"
-                + (date.strftime("%d-%m-%Y %H:%M"))
-            )
-            keyboard = [
-                [
-                    InlineKeyboardButton("✔️ Выполнить", callback_data="done"),
-                    InlineKeyboardButton("📅 Напомнить", callback_data="date"),
-                    InlineKeyboardButton("❌ Удалить", callback_data="del"),
-                ]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            if (
-                text is not None
-                and not text.isspace()
-                and text != messages.calendar_message
-            ):
-                await context.bot.editMessageText(
-                    chat_id=user_states[user_id]["data_chat_id"],
-                    message_id=user_states[user_id]["bot_message_id"],
-                    text=text,
-                    reply_markup=reply_markup,
-                )
+            await context.bot.delete_message(data_chat_id, data_message_id)
         except Exception as e:
             print(e)
             pass
         finally:
-            user_states[user_id] = {}
-
-
-async def pop_task():
-    global user_states
-    while True:
-        await asyncio.sleep(59)
-        try:
-            if collection is not None:
-                cur = collection.find()
-                for rec in cur:
-                    if rec["date"] is not None:
-                        date = datetime.datetime.strptime(
-                            rec["date"], "%Y-%m-%dT%H:%M:%S.%fZ"
-                        )
-                        if date.strftime(
-                            "%d-%m-%Y %H:%M"
-                        ) == datetime.datetime.now().strftime("%d-%m-%Y %H:%M"):
-                            new_rec = await tg_app.bot.copyMessage(
-                                chat_id=rec["chat_id"],
-                                from_chat_id=rec["chat_id"],
-                                message_id=rec["message_id"],
-                            )
-                            keyboard = [
-                                [
-                                    InlineKeyboardButton(
-                                        "✔️ Выполнить", callback_data="done"
-                                    ),
-                                    InlineKeyboardButton(
-                                        "📅 Напомнить", callback_data="date"
-                                    ),
-                                    InlineKeyboardButton(
-                                        "❌ Удалить", callback_data="del"
-                                    ),
-                                ]
-                            ]
-                            reply_markup = InlineKeyboardMarkup(keyboard)
-                            await tg_app.bot.edit_message_reply_markup(
-                                chat_id=rec["chat_id"],
-                                message_id=new_rec.message_id,
-                                reply_markup=reply_markup,
-                            )
-                            try:
-                                await tg_app.bot.delete_message(
-                                    chat_id=rec["chat_id"], message_id=rec["message_id"]
-                                )
-                            except Exception as e:
-                                print(e)
-
-                            collection.find_one_and_update(
-                                {"message_id": rec["message_id"]},
-                                {
-                                    "$set": {
-                                        "message_id": new_rec.message_id,
-                                        "date": (
-                                            datetime.datetime.now()
-                                            + relativedelta(minutes=10)
-                                        ).strftime("%d-%m-%Y %H:%M"),
-                                    }
-                                },
-                            )
-                        elif date < datetime.datetime.now():
-                            if collection is not None:
-                                collection.delete_many(
-                                    {"message_id": rec["message_id"]}
-                                )
-        except Exception as e:
-            print(e)
-            pass
+            data_chat_id = None
+            data_message_id = None
 
 
 async def main() -> None:
@@ -698,7 +684,72 @@ async def main() -> None:
         await tg_app.stop()
 
 
+async def pop_task():
+    while True:
+        await asyncio.sleep(59)
+        try:
+            if collection is not None:
+                cur = collection.find()
+                for rec in cur:
+                    if rec["date"] is not None:
+                        date = datetime.datetime.strptime(
+                            rec["date"], "%Y-%m-%dT%H:%M:%S.%fZ"
+                        )
+                        if date.strftime(
+                            "%d.%m.%Y %H:%M"
+                        ) == datetime.datetime.now().strftime("%d.%m.%Y %H:%M"):
+                            new_rec = await tg_app.bot.copyMessage(
+                                chat_id=rec["chat_id"],
+                                from_chat_id=rec["chat_id"],
+                                message_id=rec["message_id"],
+                            )
+                            keyboard = [
+                                [
+                                    InlineKeyboardButton(
+                                        "✔️ Выполнить", callback_data="done"
+                                    ),
+                                    InlineKeyboardButton(
+                                        "📅 Напомнить", callback_data="date"
+                                    ),
+                                    InlineKeyboardButton(
+                                        "❌ Удалить", callback_data="del"
+                                    ),
+                                ]
+                            ]
+                            reply_markup = InlineKeyboardMarkup(keyboard)
+                            await tg_app.bot.edit_message_reply_markup(
+                                chat_id=rec["chat_id"],
+                                message_id=new_rec.message_id,
+                                reply_markup=reply_markup,
+                            )
+                            await tg_app.bot.delete_message(
+                                chat_id=rec["chat_id"], message_id=rec["message_id"]
+                            )
+                            collection.find_one_and_update(
+                                {"message_id": rec["message_id"]},
+                                {
+                                    "$set": {
+                                        "message_id": new_rec.message_id,
+                                        "date": (
+                                            datetime.datetime.now()
+                                            + relativedelta(minutes=10)
+                                        ).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+                                    }
+                                },
+                            )
+                        elif date < datetime.datetime.now():
+                            if collection is not None:
+                                collection.delete_many(
+                                    {"message_id": rec["message_id"]}
+                                )
+        except Exception as e:
+            print(e)
+            pass
+
+
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
+    cors = asyncio.wait([pop_task(), main()])
+    loop.run_until_complete(cors)
     cors = asyncio.wait([pop_task(), main()])
     loop.run_until_complete(cors)

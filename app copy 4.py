@@ -156,6 +156,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     ):
         await inline_handler(update, context)
         return
+    # clear user_states[user_id]
     try:
         await context.bot.delete_message(
             user_states[user_id]["data_chat_id"],
@@ -295,6 +296,7 @@ async def selectDate(update, context, date):
             text=text,
             reply_markup=reply_markup,
         )
+    # del user_states[user_id]
     return
 
 
@@ -363,6 +365,8 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         first = await update.message.reply_audio(
             audio=update.message.audio, caption=update.message.caption
         )
+    # elif update.message.photo is not None:
+    #     first = await update.message.reply_photo(update.message.photo)
     elif update.message.document is not None:
         first = await update.message.reply_document(
             document=update.message.document, caption=update.message.caption
@@ -389,6 +393,7 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
     else:
         first = await update.message.reply_text(update.message.text)
+    # first = await update.message.reply_text(update.message.text)
     keyboard = [
         [
             InlineKeyboardButton("✔️ Выполнить", callback_data="done"),
@@ -412,6 +417,8 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             caption=first.caption + today,
             reply_markup=reply_markup,
         )
+    # elif update.message.photo is not None:
+    #     first = await update.message.reply_photo(update.message.photo)
     elif update.message.document is not None:
         second = await bot.editMessageCaption(
             chat_id=first.chat_id,
@@ -562,6 +569,7 @@ async def inline_calendar_handler(update, context):
         user_states[user_id]["date"] = date
 
         print(date.strftime("%d-%m-%Y %H:%M"))
+        # await selectDate(update, context, date)
         try:
             await context.bot.delete_message(
                 user_states[user_id]["data_chat_id"],
