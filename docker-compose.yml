@@ -1,17 +1,17 @@
 version: "3.8"
 
 services:
-  # todotelegrambot:
-  #   image: todotelegrambot
-  #   build:
-  #     context: .
-  #     dockerfile: ./Dockerfile
-  #   command: ["pwd"]
-  #   volumes:
-  #     - ./app.py:/app/app.py
-  #     - ./.env:/app/.env
-  #   depends_on:
-  #     - mongodb
+  todotelegrambot:
+    image: todotelegrambot
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: ["pwd"]
+    volumes:
+      - ./app.py:/app/app.py
+      - ./.env:/app/.env
+    depends_on:
+      - mongodb
   webservercert:
     image: nginx:latest
     ports:
