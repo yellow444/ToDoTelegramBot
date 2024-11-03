@@ -1,0 +1,64 @@
+apiVersion: cert-manager.io/v1
+# kind: Issuer
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-production
+  # namespace: telegramcalendar
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    # server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: yellow444@email.ru # Нужно указать реальный!
+    privateKeySecretRef:
+      name: letsencrypt-production
+      # name: tls-231977.fornex.cloud-key
+      # key: 231977.fornex.cloud-token
+    solvers:
+    - http01:
+        ingress:
+          ingressClassName: nginx
+          # serviceType: LoadBalancer
+          # spec:
+          #   externalIPs:
+          #     - 79.132.140.197
+          #   ports:
+          #     - name: http
+          #       protocol: TCP
+          #       port: 80
+          #       targetPort: 8089            
+          # ingressTemplate:
+          #   metadata:
+          #     labels:
+          #       foo: "bar"
+          #     annotations:
+          #       "nginx.ingress.kubernetes.io/whitelist-source-range": "0.0.0.0/0,::/0"
+          #       "nginx.org/mergeable-ingress-type": "minion"
+          #       "traefik.ingress.kubernetes.io/frontend-entry-points": "http"
+
+---
+# apiVersion: cert-manager.io/v1
+# kind: Certificate
+# metadata:
+#   # namespace: telegramcalendar
+#   name: 231977.fornex.cloud-crt
+# spec:
+#   secretName: tls-231977.fornex.cloud-secret
+#   issuerRef:
+#     kind: Issuer
+#     name: letsencrypt-staging
+#   commonName: 231977.fornex.cloud
+#   dnsNames:
+#   - 231977.fornex.cloud
+# ---
+# apiVersion: cert-manager.io/v1
+# kind: Certificate
+# metadata:
+#   name: tls-231977.fornex.cloud-secret
+#   namespace: default
+# spec:
+#   secretName: tls-231977.fornex.cloud-secret
+#   issuerRef:
+#     name: letsencrypt-telegramcalendar-issuer
+#   commonName: '*.231977.fornex.cloud'
+#   dnsNames:
+#   - 231977.fornex.cloud
