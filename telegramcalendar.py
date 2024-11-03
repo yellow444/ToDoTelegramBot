@@ -144,6 +144,16 @@ def create_calendar(cur=None):
         )
     )
     keyboard.append(row)
+    row = []
+    row.append(
+        InlineKeyboardButton(
+            "CANCEL",
+            callback_data=create_callback_data(
+                "CANCEL", cur.year, cur.month, cur.day, cur.hour, cur.minute
+            ),
+        )
+    )
+    keyboard.append(row)
     return InlineKeyboardMarkup(keyboard)
 
 
@@ -244,6 +254,11 @@ async def process_calendar_selection(update, context):
             chat_id=query.message.chat_id,
             message_id=query.message.message_id,
             reply_markup=create_calendar(ne),
+        )
+    elif action == "CANCEL":
+        ret_data = (
+            True,
+            "CANCEL",
         )
     else:
         await context.bot.answer_callback_query(

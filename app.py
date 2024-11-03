@@ -2,12 +2,12 @@
 import asyncio
 import datetime
 import json
+# import locale
 import logging
-from pathlib import Path
+import os
+import time
 
-import uvicorn
 from dateutil.relativedelta import relativedelta
-from fastapi import FastAPI, Request
 from pydantic import BaseModel, BaseSettings
 from pymongo import MongoClient
 from telegram import (InlineKeyboardButton, InlineKeyboardMarkup,
@@ -18,6 +18,10 @@ from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
 import messages
 import telegramcalendar
 import utils
+
+os.environ["TZ"] = "Europe/Moscow"
+time.tzset()
+# locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')
 
 tg_app = None
 
@@ -63,8 +67,6 @@ class Settings(BaseSettings):
 
 config = Settings()
 
-app = FastAPI()
-
 MONGO_HOST = config.MONGO_HOST
 MONGO_PORT = config.MONGO_PORT
 MONGO_USER = config.MONGO_USER
@@ -78,7 +80,7 @@ try:
         MONGO_PORT,
         username=MONGO_USER,
         password=MONGO_PASS,
-        serverSelectionTimeoutMS=3000,
+        serverSelectionTimeoutMS=30000,
     )
     try:
         client.server_info()
@@ -89,32 +91,23 @@ try:
             MONGO_PORT,
             username=MONGO_USER,
             password=MONGO_PASS,
-            serverSelectionTimeoutMS=3000,
+            serverSelectionTimeoutMS=30000,
         )
         client.server_info()
     db = client[config.DB_NAME]
     collection = db[config.COLLECTION_NAME]
+    print("mongo")
 except Exception as e:
     print(e)
+    print("no mongo")
     client = None
 TOKEN = config.TOKEN
 HOSTNAME = config.MYHOSTNAME
 PORT = 80
-
+print(HOSTNAME)
 
 class HealthCheck(BaseModel):
     status: str = "OK"
-
-
-@app.get("/")
-async def web_html(request: Request):
-    print("web_html")
-
-
-@app.get("/hc")
-async def hc(request: Request):
-    print("hc")
-    return HealthCheck(status="OK")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -245,6 +238,7 @@ async def selectDate(update, context, date):
         else query.message.from_user.id
     )
     bot_message_id = query.message._id_attrs[0]
+    bot_message_text = query.message.text
     print("selected")
     _chat_id = query.message.chat.id
     if collection is not None:
@@ -255,7 +249,7 @@ async def selectDate(update, context, date):
                     "chat_id": _chat_id,
                     "message_id": bot_message_id,
                     "message": bot_message_text,
-                    "caption": bot_message_caption,
+                    "caption": user_states[user_id]["bot_message_caption"],
                     "date": (user_states[user_id]["date"]).strftime("%d-%m-%Y %H:%M"),
                     "today": today,
                 }
@@ -561,13 +555,20 @@ async def inline_calendar_handler(update, context):
     if selected:
         user_states[user_id]["date"] = date
 
-        print(date.strftime("%d-%m-%Y %H:%M"))
+        # print(date.strftime("%d-%m-%Y %H:%M"))
         try:
             await context.bot.delete_message(
                 user_states[user_id]["data_chat_id"],
                 user_states[user_id]["data_message_id"],
             )
+            if date == "CANCEL":
+                if collection is not None:
+                    collection.delete_many(
+                        {"message_id": user_states[user_id]["data_message_id"]}
+                    )
+                user_states[user_id] = {}
 
+                return
             text = (
                 user_states[user_id]["bot_message_text"].split(" ::")[0]
                 + " ::"
@@ -592,6 +593,41 @@ async def inline_calendar_handler(update, context):
                     text=text,
                     reply_markup=reply_markup,
                 )
+                if collection is not None:
+                    if (
+                        db.mycollections.count_documents(
+                            {"message_id": user_states[user_id]["bot_message_id"]}
+                        )
+                        == 0
+                    ):
+                        today = " :" + datetime.datetime.today().strftime(
+                            "%d-%m-%Y %H:%M"
+                        )
+                        collection.insert_one(
+                            {
+                                "chat_id": user_states[user_id]["data_chat_id"],
+                                "message_id": user_states[user_id]["bot_message_id"],
+                                "message": user_states[user_id][
+                                    "bot_message_text"
+                                ].split(" ::")[0],
+                                "caption": user_states[user_id]["bot_message_caption"],
+                                "date": (user_states[user_id]["date"]).strftime(
+                                    "%d-%m-%Y %H:%M"
+                                ),
+                                "today": today,
+                            }
+                        )
+                    else:
+                        collection.find_one_and_update(
+                            {"message_id": user_states[user_id]["bot_message_id"]},
+                            {
+                                "$set": {
+                                    "date": (user_states[user_id]["date"]).strftime(
+                                        "%d-%m-%Y %H:%M"
+                                    )
+                                }
+                            },
+                        )
         except Exception as e:
             print(e)
             pass
@@ -602,15 +638,13 @@ async def inline_calendar_handler(update, context):
 async def pop_task():
     global user_states
     while True:
-        await asyncio.sleep(59)
+        await asyncio.sleep(60)
         try:
             if collection is not None:
                 cur = collection.find()
                 for rec in cur:
                     if rec["date"] is not None:
-                        date = datetime.datetime.strptime(
-                            rec["date"], "%Y-%m-%dT%H:%M:%S.%fZ"
-                        )
+                        date = datetime.datetime.strptime(rec["date"], "%d-%m-%Y %H:%M")
                         if date.strftime(
                             "%d-%m-%Y %H:%M"
                         ) == datetime.datetime.now().strftime("%d-%m-%Y %H:%M"):
@@ -662,6 +696,8 @@ async def pop_task():
                                 collection.delete_many(
                                     {"message_id": rec["message_id"]}
                                 )
+                        else:
+                            pass
         except Exception as e:
             print(e)
             pass
@@ -670,17 +706,6 @@ async def pop_task():
 async def main() -> None:
     global tg_app
     print("main")
-    server = uvicorn.Server(
-        config=uvicorn.Config(
-            f"{Path(__file__).stem}:app",
-            port=PORT,
-            host="0.0.0.0",
-            reload=True,
-        )
-    )
-    if not TOKEN:
-        await server.serve()
-        return
     tg_app = Application.builder().token(TOKEN).build()
     tg_app.add_handler(CommandHandler("start", start))
     tg_app.add_handler(CommandHandler("stop", stop))
@@ -693,9 +718,6 @@ async def main() -> None:
     async with tg_app:
         await tg_app.updater.start_polling()
         await tg_app.start()
-        await server.serve()
-        await tg_app.updater.stop()
-        await tg_app.stop()
 
 
 if __name__ == "__main__":

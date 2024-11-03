@@ -1,17 +1,17 @@
 version: "3.8"
 
 services:
-  # todotelegrambot:
-  #   image: todotelegrambot
-  #   build:
-  #     context: .
-  #     dockerfile: ./Dockerfile
-  #   command: ["pwd"]
-  #   volumes:
-  #     - ./app.py:/app/app.py
-  #     - ./.env:/app/.env
-  #   depends_on:
-  #     - mongodb
+  todotelegrambot:
+    image: todotelegrambot
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: [ "pwd" ]
+    volumes:
+      - ./app.py:/app/app.py
+      - ./.env:/app/.env
+    depends_on:
+      - mongodb
   webservercert:
     image: nginx:latest
     ports:
@@ -43,12 +43,12 @@ services:
     image: mongo:latest
     container_name: "mongodb"
     restart: always
-    command: mongod --auth
+    # command: mongod --auth
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: password123
       MONGO_INITDB_DATABASE: admin
-    ports: 
+    ports:
       - 27017:27017
     volumes:
       - ./mongo-data:/data/db
