@@ -35,7 +35,7 @@ spec:
       initContainers:
         - name: wait-for-mongodb
           image: busybox
-          command: ['sh', '-c', 'until nc -z -v -w30 mongodb 27017; do echo "Waiting for MongoDB..."; sleep 5; done']
+          command: ['sh', '-c', 'until nc -z -v -w30 mongodb.telegramcalendar.svc.cluster.local 27017; do echo "Waiting for MongoDB..."; sleep 5; done']
           # nc -z -v -w30 mongodb 27017
           # Ожидание до тех пор, пока MongoDB не начнёт принимать соединения
       restartPolicy: Always

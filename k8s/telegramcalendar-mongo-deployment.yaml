@@ -28,6 +28,9 @@ spec:
           volumeMounts:
             - mountPath: /data/db
               name: mongodata
+          command:
+            - mongod
+            - "--bind_ip_all"  # Включаем bind на всех интерфейсах
       volumes:
         - name: mongodata
           persistentVolumeClaim:
