@@ -2,6 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: telegramcalendar-config-map
+  namespace: telegramcalendar
 data:
   TOKEN: '6531252215:AAFu4lIS43TwjEDJ7Y65EIrUt3PNKqLtiCw'
   MYHOSTNAME: 'https://broadband-188-255-24-92.ip.moscow.rt.ru'
