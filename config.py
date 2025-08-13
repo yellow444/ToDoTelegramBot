@@ -1,12 +1,22 @@
+from pydantic import BaseSettings
 
 
+class Settings(BaseSettings):
+    """Application configuration loaded from environment variables."""
 
-BOT_TOKEN = '6531252215:AAFu4lIS43TwjEDJ7Y65EIrUt3PNKqLtiCw'
+    MONGO_HOST: str
+    MONGO_PORT: int
+    MONGO_USER: str
+    MONGO_PASS: str
+    DB_NAME: str
+    COLLECTION_NAME: str
+    TOKEN: str
+    MYHOSTNAME: str
+    PORT: str
 
-hostname = 'mongodb'
-# hostname = '127.0.0.1'
-port = 27017  # Default MongoDB port
-username = 'root'  # If authentication is required
-password = 'password123'  # If authentication is required
-teleg = 'teleg'
-msg = 'msg'
+    class Config:
+        env_file = ".env"
+
+
+settings = Settings()
+
