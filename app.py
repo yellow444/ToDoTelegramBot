@@ -103,6 +103,21 @@ g_months = {
     11: "November", 12: "December",
 }
 
+
+async def calendar_timeout(bot, chat_id, message_id, user_id):
+    await asyncio.sleep(30)
+    state = user_states.get(user_id, {})
+    if state.get("data_message_id") == message_id and state.get("waiting_for_date"):
+        try:
+            await bot.delete_message(chat_id=chat_id, message_id=message_id)
+        except Exception as e:
+            logger.warning("Ошибка удаления сообщения календаря: %s", e)
+        try:
+            await bot.send_message(chat_id=chat_id, text=messages.calendar_timeout)
+        except Exception as e:
+            logger.warning("Ошибка отправки сообщения тайм-аута: %s", e)
+        user_states[user_id] = {}
+
 # Обработчик нажатий на inline-кнопки
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
@@ -369,6 +384,11 @@ async def calendar_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_states[user_id]["data_chat_id"] = msg.chat.id
         user_states[user_id]["data_message_id"] = msg.message_id
         user_states[user_id]["waiting_for_date"] = messages.calendar_message
+        if task := user_states[user_id].get("timeout_task"):
+            task.cancel()
+        user_states[user_id]["timeout_task"] = asyncio.create_task(
+            calendar_timeout(bot, msg.chat.id, msg.message_id, user_id)
+        )
     except Exception as e:
         logger.error("Ошибка в calendar_handler: %s", e)
 
@@ -446,6 +466,8 @@ async def inline_calendar_handler(update: Update, context: ContextTypes.DEFAULT_
         bot = context.bot
         user_id = query.from_user.id
         selected, date = await telegramcalendar.process_calendar_selection(update, context)
+        if task := user_states.get(user_id, {}).pop("timeout_task", None):
+            task.cancel()
         if selected:
             user_states[user_id]["date"] = date
             try:
@@ -456,6 +478,13 @@ async def inline_calendar_handler(update: Update, context: ContextTypes.DEFAULT_
                 if date == "CANCEL":
                     if collection is not None:
                         collection.delete_many({"message_id": user_states[user_id]["data_message_id"]})
+                    try:
+                        await bot.send_message(
+                            chat_id=user_states[user_id]["data_chat_id"],
+                            text=messages.calendar_cancelled,
+                        )
+                    except Exception as e:
+                        logger.warning("Ошибка отправки уведомления CANCEL: %s", e)
                     user_states[user_id] = {}
                     return
                 text = (
@@ -496,6 +525,10 @@ async def inline_calendar_handler(update: Update, context: ContextTypes.DEFAULT_
                 logger.error("Ошибка в inline_calendar_handler: %s", e)
             finally:
                 user_states[user_id] = {}
+        else:
+            user_states[user_id]["timeout_task"] = asyncio.create_task(
+                calendar_timeout(bot, query.message.chat.id, query.message.message_id, user_id)
+            )
     except Exception as e:
         logger.error("Ошибка в inline_calendar_handler (общая): %s", e)
 

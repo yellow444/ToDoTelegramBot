@@ -168,6 +168,7 @@ async def process_calendar_selection(update, context):
     """
     ret_data = (False, None)
     query = update.callback_query
+    await query.answer(cache_time=0, timeout=30)
     # print(query)
     (_, action, curYear, curMonth, curDay, curHour, curMin) = (
         utils.separate_callback_data(query.data)
@@ -180,7 +181,7 @@ async def process_calendar_selection(update, context):
         minute=int(curMin),
     )
     if action == "IGNORE":
-        await context.bot.answer_callback_query(callback_query_id=query.id)
+        pass
     elif action == "DAY":
         await context.bot.edit_message_text(
             text=query.message.text,
@@ -261,8 +262,8 @@ async def process_calendar_selection(update, context):
             "CANCEL",
         )
     else:
-        await context.bot.answer_callback_query(
-            callback_query_id=query.id, text="Something went wrong!"
+        await context.bot.send_message(
+            chat_id=query.message.chat_id, text="Something went wrong!"
         )
     # UNKNOWN
     return ret_data
