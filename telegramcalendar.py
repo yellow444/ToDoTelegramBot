@@ -157,6 +157,22 @@ def create_calendar(cur=None):
     return InlineKeyboardMarkup(keyboard)
 
 
+async def _safe_edit_calendar(query, context, new_date):
+    try:
+        await context.bot.edit_message_text(
+            text=query.message.text,
+            chat_id=query.message.chat_id,
+            message_id=query.message.message_id,
+            reply_markup=create_calendar(new_date),
+        )
+    except Exception:
+        await context.bot.answer_callback_query(
+            callback_query_id=query.id,
+            text="Не удалось обновить календарь. Попробуйте ещё раз.",
+            show_alert=True,
+        )
+
+
 async def process_calendar_selection(update, context):
     """
     Process the callback_query. This method generates a new calendar if forward or
@@ -168,7 +184,7 @@ async def process_calendar_selection(update, context):
     """
     ret_data = (False, None)
     query = update.callback_query
-    await query.answer(cache_time=0, timeout=30)
+    await query.answer()
     # print(query)
     (_, action, curYear, curMonth, curDay, curHour, curMin) = (
         utils.separate_callback_data(query.data)
@@ -183,79 +199,46 @@ async def process_calendar_selection(update, context):
     if action == "IGNORE":
         pass
     elif action == "DAY":
-        await context.bot.edit_message_text(
-            text=query.message.text,
-            chat_id=query.message.chat_id,
-            message_id=query.message.message_id,
-        )
-        ret_data = (
-            True,
-            curr,
-        )
+        try:
+            await context.bot.edit_message_text(
+                text=query.message.text,
+                chat_id=query.message.chat_id,
+                message_id=query.message.message_id,
+            )
+            ret_data = (
+                True,
+                curr,
+            )
+        except Exception:
+            await context.bot.answer_callback_query(
+                callback_query_id=query.id,
+                text="Не удалось обновить календарь. Попробуйте ещё раз.",
+                show_alert=True,
+            )
     elif action == "PREV-MONTH":
         pre = curr - dateutil.relativedelta.relativedelta(months=1)
-        await context.bot.edit_message_text(
-            text=query.message.text,
-            chat_id=query.message.chat_id,
-            message_id=query.message.message_id,
-            reply_markup=create_calendar(pre),
-        )
+        await _safe_edit_calendar(query, context, pre)
     elif action == "NEXT-MONTH":
         ne = curr + dateutil.relativedelta.relativedelta(months=1)
-        await context.bot.edit_message_text(
-            text=query.message.text,
-            chat_id=query.message.chat_id,
-            message_id=query.message.message_id,
-            reply_markup=create_calendar(ne),
-        )
+        await _safe_edit_calendar(query, context, ne)
     elif action == "PREV-HOUR":
         pre = curr - dateutil.relativedelta.relativedelta(hours=1)
-        await context.bot.edit_message_text(
-            text=query.message.text,
-            chat_id=query.message.chat_id,
-            message_id=query.message.message_id,
-            reply_markup=create_calendar(pre),
-        )
+        await _safe_edit_calendar(query, context, pre)
     elif action == "NEXT-HOUR":
         ne = curr + dateutil.relativedelta.relativedelta(hours=1)
-        await context.bot.edit_message_text(
-            text=query.message.text,
-            chat_id=query.message.chat_id,
-            message_id=query.message.message_id,
-            reply_markup=create_calendar(ne),
-        )
+        await _safe_edit_calendar(query, context, ne)
     elif action == "PREV-MIN":
         pre = curr - dateutil.relativedelta.relativedelta(minutes=1)
-        await context.bot.edit_message_text(
-            text=query.message.text,
-            chat_id=query.message.chat_id,
-            message_id=query.message.message_id,
-            reply_markup=create_calendar(pre),
-        )
+        await _safe_edit_calendar(query, context, pre)
     elif action == "NEXT-MIN":
         ne = curr + dateutil.relativedelta.relativedelta(minutes=1)
-        await context.bot.edit_message_text(
-            text=query.message.text,
-            chat_id=query.message.chat_id,
-            message_id=query.message.message_id,
-            reply_markup=create_calendar(ne),
-        )
+        await _safe_edit_calendar(query, context, ne)
     elif action == "PREV-YEAR":
         pre = curr - dateutil.relativedelta.relativedelta(years=1)
-        await context.bot.edit_message_text(
-            text=query.message.text,
-            chat_id=query.message.chat_id,
-            message_id=query.message.message_id,
-            reply_markup=create_calendar(pre),
-        )
+        await _safe_edit_calendar(query, context, pre)
     elif action == "NEXT-YEAR":
         ne = curr + dateutil.relativedelta.relativedelta(years=1)
-        await context.bot.edit_message_text(
-            text=query.message.text,
-            chat_id=query.message.chat_id,
-            message_id=query.message.message_id,
-            reply_markup=create_calendar(ne),
-        )
+        await _safe_edit_calendar(query, context, ne)
     elif action == "CANCEL":
         ret_data = (
             True,
