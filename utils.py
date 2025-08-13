@@ -26,4 +26,3 @@ def task_markup(done: bool = False) -> InlineKeyboardMarkup:
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
-
