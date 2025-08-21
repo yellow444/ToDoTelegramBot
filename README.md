@@ -33,7 +33,19 @@ docker-compose up -d
 ```
 
 ### Kubernetes / Helm
-В каталоге `k8s` находятся манифесты для запуска в Kubernetes. Применить их можно командой:
+В каталоге `k8s` находятся манифесты для запуска в Kubernetes.
+
+#### Секреты
+```bash
+kubectl create secret generic telegramcalendar-secret \
+  --namespace telegramcalendar \
+  --from-literal=TOKEN=<bot-token> \
+  --from-literal=MONGO_USER=<mongo-user> \
+  --from-literal=MONGO_PASS=<mongo-pass>
+```
+Замените примерные значения на реальные и ограничьте доступ к секретам.
+
+После создания секрета можно применить манифесты:
 ```bash
 kubectl apply -f k8s/
 ```
