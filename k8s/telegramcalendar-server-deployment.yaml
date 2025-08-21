@@ -29,6 +29,8 @@ spec:
               cpu: 1000m
               memory: 512Mi
           envFrom:
+            - secretRef:
+                name: telegramcalendar-secret
             - configMapRef:
                 name: telegramcalendar-config-map
       # Добавляем initContainer для проверки доступности MongoDB
