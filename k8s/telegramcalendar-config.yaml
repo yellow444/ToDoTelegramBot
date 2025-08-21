@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: telegramcalendar-config-map
+  namespace: telegramcalendar
+data:
+  MYHOSTNAME: 'https://broadband-188-255-24-92.ip.moscow.rt.ru'
+  SSL_CERT: '/app/ssl/live/broadband-188-255-24-92.ip.moscow.rt.ru/fullchain.pem'
+  SSL_KEY: '/app/ssl/live/broadband-188-255-24-92.ip.moscow.rt.ru/privkey.pem'
+  PORT: '80'
+  MONGO_HOST: 'mongodb'
+  MONGO_PORT: '27017'
+  DB_NAME: 'teleg'
+  COLLECTION_NAME: 'collection'
+  MONGO_URI: 'mongodb://root:password123@mongodb.telegramcalendar.svc.cluster.local:27017/teleg?authSource=admin'
+  TZ: "Europe/Moscow"

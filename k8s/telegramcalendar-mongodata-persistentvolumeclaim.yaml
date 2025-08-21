@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  creationTimestamp: null
+  namespace: telegramcalendar
+  labels:
+    io.kompose.service: mongodata
+  name: mongodata
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: local-storage
+  resources:
+    requests:
+      storage: 500Mi
+status: {}
