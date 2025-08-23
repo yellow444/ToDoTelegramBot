@@ -1,0 +1,19 @@
+cert.pem
+key.pem
+__pycache__
+node_modules
+.ruff_cache
+!.env
+
+# Replit files and config:
+venv/
+.upm/
+.replit
+replit.nix
+poetry.lock
+**/node_modules
+**/dist/**
+/mongo-data/**
+
+/.venv/**
+/certbot/conf/**

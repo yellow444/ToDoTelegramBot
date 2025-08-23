@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telegramcalendar-server
+  namespace: telegramcalendar
+  labels:
+    io.kompose.service: telegramcalendar-server
+    app.kubernetes.io/name: telegramcalendar
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: telegramcalendar-server
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        io.kompose.service: telegramcalendar-server
+    spec:
+      containers:
+        - image: yellow444/telegramcalendarserver:latest
+          imagePullPolicy: Always
+          name: telegramcalendar-server
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+          envFrom:
+            - secretRef:
+                name: telegramcalendar-secret
+            - configMapRef:
+                name: telegramcalendar-config-map
+      # Добавляем initContainer для проверки доступности MongoDB
+      initContainers:
+        - name: wait-for-mongodb
+          image: busybox
+          command: ['sh', '-c', 'until nc -z -v -w30 mongodb.telegramcalendar.svc.cluster.local 27017; do echo "Waiting for MongoDB..."; sleep 5; done']
+          # nc -z -v -w30 mongodb 27017
+          # Ожидание до тех пор, пока MongoDB не начнёт принимать соединения
+      restartPolicy: Always
+status: {}
