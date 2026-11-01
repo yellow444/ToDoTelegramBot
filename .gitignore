@@ -3,7 +3,8 @@ key.pem
 __pycache__
 node_modules
 .ruff_cache
-!.env
+.env
+.pytest_cache
 
 # Replit files and config:
 venv/
@@ -17,3 +18,18 @@ poetry.lock
 
 /.venv/**
 /certbot/conf/**
+
+# сессия userbot (ключ к аккаунту!), модели, вложения, журнал агентов
+/data/
+/agent-context/
+tests/data/*.session
+
+# письма агентов: репозиторий публичный, переписка остаётся локально
+/mailbox/to-codex/*.md
+/mailbox/to-claude/*.md
+/mailbox/archive/*.md
+
+# секреты Kubernetes: в git только шаблон *.example.yaml
+k8s/*-secret.yaml
+.env.*
+!.env.example
