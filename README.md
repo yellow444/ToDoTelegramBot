@@ -123,7 +123,7 @@ python -m todobot
 
 ### Mini App
 
-1. Опубликуйте веб-порт по https. В `nginx/conf/default.conf` уже есть `location /app/` с прокси на бота.
+1. Опубликуйте веб-порт по https. В `nginx/templates/default.conf.template` уже есть `location /app/` с прокси на бота.
 2. Пропишите `WEBAPP_URL=https://<домен>/app/` (со слешем на конце).
 3. В BotFather при желании задайте Menu Button / Mini App на тот же адрес.
 4. В чате выполните `/mode` или выберите режим в настройках приложения.

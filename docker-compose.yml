@@ -7,7 +7,7 @@ services:
     cpu_shares: 4096  # на машине много тяжёлых контейнеров; боту процессор нужен редко, но сразу
     env_file: .env
     environment:
-      MONGO_URI: mongodb://${MONGO_USER:-root}:${MONGO_PASS:-change-me}@mongodb:27017/?authSource=admin
+      MONGO_URI: mongodb://${MONGO_USER:-root}:${MONGO_PASS:?задайте MONGO_PASS в .env}@mongodb:27017/?authSource=admin
       HF_HOME: /app/data/hf  # кэш моделей whisper
       FILES_DIR: /app/data/files
       TG_SESSION: /app/data/userbot.session
@@ -27,7 +27,7 @@ services:
     cpu_shares: 4096
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-root}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS:-change-me}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS:?задайте MONGO_PASS в .env}
     volumes:
       - ./mongo-data:/data/db
     healthcheck:
@@ -52,11 +52,13 @@ services:
   webserver:
     image: nginx:latest
     profiles: ["web"]
+    environment:
+      DOMAIN_NAME: ${DOMAIN_NAME:-localhost}
     ports:
       - 443:443
     restart: always
     volumes:
-      - ./nginx/conf/:/etc/nginx/conf.d/:rw
+      - ./nginx/templates/:/etc/nginx/templates/:ro  # ${DOMAIN_NAME} подставляет сам образ nginx
       - ./certbot/conf/:/etc/nginx/ssl/:ro
       - ./datawww/:/etc/nginx/html/
     depends_on:
@@ -67,7 +69,7 @@ services:
     profiles: ["cert"]
     env_file:
       - .env
-    command: certonly --webroot --email user@example.com --webroot-path /var/www/certbot/ --non-interactive --agree-tos -d ${DOMAIN_NAME}
+    command: certonly --webroot --email ${CERTBOT_EMAIL:-} --webroot-path /var/www/certbot/ --non-interactive --agree-tos -d ${DOMAIN_NAME}
     volumes:
       - ./certbot/www/:/var/www/certbot/:rw
       - ./certbot/conf/:/etc/letsencrypt/:rw

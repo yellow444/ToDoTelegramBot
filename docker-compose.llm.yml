@@ -1,4 +1,4 @@
-# Подключение к llm-gateway (C:\repos\llm-gateway) по его docker-сети.
+# Подключение к llm-gateway по его docker-сети.
 #   docker compose -f docker-compose.yml -f docker-compose.llm.yml up -d --build
 services:
   todobot:
