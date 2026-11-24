@@ -1,0 +1,21 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "todobot-web-dev",
+      "runtimeExecutable": ".venv/Scripts/python",
+      "runtimeArgs": ["-m", "todobot"],
+      "port": 8088,
+      "env": {
+        "STORAGE": "memory",
+        "RUN_BOT": "false",
+        "WEB_PORT": "8088",
+        "WEBAPP_DEV_USER_ID": "1",
+        "OWNER_CHAT_ID": "1",
+        "LLM_BASE_URL": "http://localhost:8091/v1",
+        "MCP_TOKEN": "dev-token",
+        "PYTHONIOENCODING": "utf-8"
+      }
+    }
+  ]
+}

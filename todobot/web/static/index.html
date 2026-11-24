@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Задачи</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #ffffff);
+    --bg2: var(--tg-theme-secondary-bg-color, #f2f3f5);
+    --text: var(--tg-theme-text-color, #16181d);
+    --hint: var(--tg-theme-hint-color, #7d828c);
+    --link: var(--tg-theme-link-color, #2a7ae2);
+    --btn: var(--tg-theme-button-color, #2a7ae2);
+    --btn-text: var(--tg-theme-button-text-color, #ffffff);
+    --danger: var(--tg-theme-destructive-text-color, #d9423a);
+    --sep: color-mix(in srgb, var(--hint) 25%, transparent);
+    --radius: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-tg]) { --bg:#17191d; --bg2:#22252b; --text:#eceef2; --hint:#8b919c; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg2); color: var(--text);
+    font: 15px/1.4 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; }
+  body { padding: 12px 16px calc(24px + env(safe-area-inset-bottom)); }
+  .tabs { display: flex; gap: 4px; margin-bottom: 12px; }
+  .tab { flex: 1 1 0; min-width: 0; padding: 8px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    border: 0; border-radius: 10px; background: var(--bg); color: var(--text); font: inherit; font-size: 14px; cursor: pointer; }
+  .tab.on { background: var(--btn); color: var(--btn-text); }
+  .card { background: var(--bg); border-radius: var(--radius); padding: 12px; margin-bottom: 12px; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .grow { flex: 1; min-width: 0; }
+  input, select, textarea { width: 100%; padding: 9px 10px; border: 1px solid var(--sep); border-radius: 10px;
+    background: var(--bg); color: var(--text); font: inherit; }
+  textarea { resize: vertical; min-height: 64px; }
+  button.primary, button.ghost, button.danger { border: 0; border-radius: 10px; padding: 9px 14px; font: inherit; cursor: pointer; }
+  .primary { background: var(--btn); color: var(--btn-text); }
+  .ghost { background: var(--bg2); color: var(--text); }
+  .danger { background: transparent; color: var(--danger); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .chip { border: 1px solid var(--sep); background: var(--bg); color: var(--text); border-radius: 999px;
+    padding: 5px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+  .chip.on { border-color: var(--btn); color: var(--btn); }
+  ul.tasks { list-style: none; margin: 0; padding: 0; }
+  ul.tasks li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 2px; border-bottom: 1px solid var(--sep); }
+  ul.tasks li:last-child { border-bottom: 0; }
+  .check { width: 22px; height: 22px; flex: none; border-radius: 50%; border: 2px solid var(--hint); background: none;
+    cursor: pointer; margin-top: 1px; padding: 0; }
+  .done .check { background: var(--btn); border-color: var(--btn); }
+  .done .title { text-decoration: line-through; color: var(--hint); }
+  .title { word-break: break-word; cursor: pointer; }
+  .meta { color: var(--hint); font-size: 13px; }
+  .meta.overdue { color: var(--danger); }
+  .empty { color: var(--hint); text-align: center; padding: 24px 0; }
+  .section { color: var(--hint); font-size: 13px; text-transform: uppercase; letter-spacing: .04em; margin: 4px 2px 6px; }
+  label.field { display: block; margin-bottom: 10px; }
+  label.field span { display: block; color: var(--hint); font-size: 13px; margin-bottom: 4px; }
+  .days { display: flex; gap: 4px; }
+  .days .chip { flex: 1; text-align: center; padding: 6px 0; }
+  .switch { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; }
+  .switch input { width: auto; }
+  dialog { border: 0; border-radius: 16px; padding: 16px; width: min(520px, calc(100vw - 32px));
+    background: var(--bg); color: var(--text); }
+  dialog::backdrop { background: rgba(0,0,0,.35); }
+  .msg { white-space: pre-wrap; padding: 8px 10px; border-radius: 10px; margin: 6px 0; }
+  .msg.me { background: var(--btn); color: var(--btn-text); margin-left: 15%; }
+  .msg.bot { background: var(--bg2); margin-right: 15%; }
+  .error { color: var(--danger); font-size: 13px; min-height: 1em; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+  <nav class="tabs" id="tabs">
+    <button class="tab on" data-tab="open">Задачи</button>
+    <button class="tab" data-tab="done">Готово</button>
+    <button class="tab hidden" data-tab="ai" id="tab-ai">Ассистент</button>
+    <button class="tab" data-tab="settings">Настройки</button>
+  </nav>
+
+  <section id="view-open">
+    <form class="card" id="add">
+      <div class="row">
+        <input class="grow" id="add-text" placeholder="Новая задача… можно «завтра в 10»" autocomplete="off">
+        <button class="primary" type="submit">+</button>
+      </div>
+      <div class="chips" id="add-chips"></div>
+    </form>
+    <div class="card"><ul class="tasks" id="list-open"></ul></div>
+  </section>
+
+  <section id="view-done" class="hidden">
+    <div class="card"><ul class="tasks" id="list-done"></ul></div>
+  </section>
+
+  <section id="view-ai" class="hidden">
+    <div class="card">
+      <div id="chat"><div class="meta">Ассистент видит ваши задачи и рабочий график, умеет создавать, переносить и закрывать задачи.</div></div>
+      <form class="row" id="ask" style="margin-top:8px">
+        <input class="grow" id="ask-text" placeholder="Что у меня на завтра?" autocomplete="off">
+        <button class="primary" type="submit">→</button>
+      </form>
+    </div>
+  </section>
+
+  <section id="view-settings" class="hidden">
+    <form class="card" id="settings">
+      <div class="section">Рабочий день</div>
+      <div class="row">
+        <label class="field grow"><span>Начало</span><input type="time" name="work_start"></label>
+        <label class="field grow"><span>Конец</span><input type="time" name="work_end"></label>
+      </div>
+      <label class="field"><span>Рабочие дни</span><div class="days" id="days"></div></label>
+      <label class="field"><span>Часовой пояс</span><input name="tz" list="tzs"></label>
+      <datalist id="tzs">
+        <option>Europe/Moscow</option><option>Europe/Berlin</option><option>Europe/London</option>
+        <option>Asia/Yekaterinburg</option><option>Asia/Novosibirsk</option><option>Asia/Almaty</option><option>UTC</option>
+      </datalist>
+      <div class="section" style="margin-top:12px">Уведомления</div>
+      <label class="switch">Утренний план <input type="checkbox" name="morning_digest"></label>
+      <label class="switch">Вечерний итог <input type="checkbox" name="evening_review"></label>
+      <label class="switch" id="smart-row">Разбор задач через LLM <input type="checkbox" name="smart_input"></label>
+      <div class="section" style="margin-top:12px">Интерфейс в чате</div>
+      <select name="ui_mode">
+        <option value="buttons">Кнопки в чате</option>
+        <option value="webapp">Мини-приложение</option>
+      </select>
+      <div class="error" id="settings-error"></div>
+      <button class="primary" type="submit" style="width:100%;margin-top:8px">Сохранить</button>
+    </form>
+  </section>
+
+  <dialog id="editor">
+    <form method="dialog" id="edit-form">
+      <label class="field"><span>Задача</span><textarea name="text" required></textarea></label>
+      <label class="field"><span>Напомнить</span><input type="datetime-local" name="when"></label>
+      <div class="chips" id="edit-chips"></div>
+      <div class="row">
+        <label class="field grow"><span>Повтор</span>
+          <select name="repeat">
+            <option value="">Не повторять</option><option value="daily">Каждый день</option>
+            <option value="workdays">По будням</option><option value="weekly">Каждую неделю</option>
+            <option value="monthly">Каждый месяц</option>
+          </select>
+        </label>
+      </div>
+      <label class="switch">Только в рабочее время <input type="checkbox" name="workhours_only"></label>
+      <div class="error" id="edit-error"></div>
+      <div class="row" style="margin-top:8px">
+        <button class="danger" type="button" id="edit-delete">Удалить</button>
+        <span class="grow"></span>
+        <button class="ghost" type="button" id="edit-cancel">Отмена</button>
+        <button class="primary" type="submit">Сохранить</button>
+      </div>
+    </form>
+  </dialog>
+
+<script>
+const tg = window.Telegram && Telegram.WebApp;
+if (tg && tg.initData) { document.documentElement.dataset.tg = "1"; tg.ready(); tg.expand(); }
+const BASE = location.pathname.replace(/[^/]*$/, "");
+const params = new URLSearchParams(location.search);
+const DAYS = ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
+let me = null, editing = null, openedForTask = params.get("task");
+
+async function api(path, opts = {}) {
+  const r = await fetch(BASE + "api/" + path, {
+    ...opts,
+    headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg ? tg.initData : "", ...(opts.headers || {}) },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  if (r.status === 204) return null;
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail ? (typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail)) : r.statusText);
+  return data;
+}
+const haptic = (t) => tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred(t);
+const esc = (s) => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function taskItem(t) {
+  const li = document.createElement("li");
+  if (t.status === "done") li.className = "done";
+  const overdue = t.status === "open" && t.when_input && t.when_input < me.now_local;
+  const meta = [t.when_human ? "⏰ " + t.when_human : "", t.repeat_human ? "🔁 " + t.repeat_human : "",
+                t.workhours_only ? "🕘 раб. время" : ""].filter(Boolean).join(" · ");
+  li.innerHTML = `<button class="check" aria-label="Готово"></button>
+    <div class="grow"><div class="title">${esc(t.text)}</div>${meta ? `<div class="meta ${overdue ? "overdue" : ""}">${esc(meta)}</div>` : ""}</div>`;
+  li.querySelector(".check").onclick = async () => {
+    await api("tasks/" + t.id, { method: "PATCH", body: { status: t.status === "done" ? "open" : "done" } });
+    haptic("success"); refresh();
+  };
+  li.querySelector(".title").onclick = () => openEditor(t);
+  return li;
+}
+
+async function refresh() {
+  const [open, done] = await Promise.all([api("tasks?status=open"), api("tasks?status=done")]);
+  for (const [id, items, empty] of [["list-open", open, "Открытых задач нет 🎉"], ["list-done", done.slice(0, 100), "Пока ничего"]]) {
+    const ul = document.getElementById(id); ul.innerHTML = "";
+    if (!items.length) ul.innerHTML = `<div class="empty">${empty}</div>`;
+    items.forEach(t => ul.appendChild(taskItem(t)));
+  }
+}
+
+function chips(container, onPick) {
+  container.innerHTML = "";
+  me.presets.forEach(p => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = p.label;
+    b.onclick = () => onPick(p.value, b); container.appendChild(b);
+  });
+}
+
+let addWhen = null;
+function setupAdd() {
+  chips(document.getElementById("add-chips"), (value, b) => {
+    const on = !b.classList.contains("on");
+    document.querySelectorAll("#add-chips .chip").forEach(c => c.classList.remove("on"));
+    if (on) b.classList.add("on");
+    addWhen = on ? value : null;
+  });
+  document.getElementById("add").onsubmit = async (e) => {
+    e.preventDefault();
+    const input = document.getElementById("add-text"), text = input.value.trim();
+    if (!text) return;
+    await api("tasks", { method: "POST", body: addWhen ? { text, when: addWhen } : { text } });
+    input.value = ""; addWhen = null;
+    document.querySelectorAll("#add-chips .chip").forEach(c => c.classList.remove("on"));
+    haptic("success"); refresh();
+  };
+}
+
+function openEditor(t) {
+  editing = t;
+  const f = document.getElementById("edit-form");
+  f.text.value = t.text; f.when.value = t.when_input || ""; f.repeat.value = t.repeat || "";
+  f.workhours_only.checked = !!t.workhours_only;
+  document.getElementById("edit-error").textContent = "";
+  chips(document.getElementById("edit-chips"), (value) => { f.when.value = value; });
+  document.getElementById("editor").showModal();
+}
+function closeEditor() {
+  document.getElementById("editor").close();
+  if (openedForTask && tg && tg.initData) tg.close();
+  openedForTask = null;
+}
+function setupEditor() {
+  const f = document.getElementById("edit-form");
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await api("tasks/" + editing.id, { method: "PATCH", body: {
+        text: f.text.value, when: f.when.value || null, repeat: f.repeat.value || null, workhours_only: f.workhours_only.checked } });
+      haptic("success"); closeEditor(); refresh();
+    } catch (err) { document.getElementById("edit-error").textContent = err.message; }
+  };
+  document.getElementById("edit-cancel").onclick = closeEditor;
+  document.getElementById("edit-delete").onclick = async () => {
+    await api("tasks/" + editing.id, { method: "DELETE" }); haptic("warning"); closeEditor(); refresh();
+  };
+}
+
+function setupSettings() {
+  const f = document.getElementById("settings"), s = me.settings;
+  f.work_start.value = s.work_start; f.work_end.value = s.work_end; f.tz.value = s.tz;
+  f.morning_digest.checked = s.morning_digest; f.evening_review.checked = s.evening_review;
+  f.smart_input.checked = s.smart_input; f.ui_mode.value = s.ui_mode;
+  document.getElementById("smart-row").classList.toggle("hidden", !me.llm);
+  const days = document.getElementById("days"); days.innerHTML = "";
+  DAYS.forEach((d, i) => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "chip" + (s.workdays.includes(i + 1) ? " on" : "");
+    b.textContent = d; b.dataset.day = i + 1; b.onclick = () => b.classList.toggle("on"); days.appendChild(b);
+  });
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    const err = document.getElementById("settings-error"); err.textContent = "";
+    try {
+      me.settings = await api("settings", { method: "PATCH", body: {
+        work_start: f.work_start.value, work_end: f.work_end.value, tz: f.tz.value.trim(),
+        workdays: [...days.querySelectorAll(".chip.on")].map(b => +b.dataset.day),
+        morning_digest: f.morning_digest.checked, evening_review: f.evening_review.checked,
+        smart_input: f.smart_input.checked, ui_mode: f.ui_mode.value } });
+      haptic("success"); err.textContent = "Сохранено";
+    } catch (ex) { err.textContent = ex.message; }
+  };
+}
+
+function setupAsk() {
+  if (!me.llm) return;
+  document.getElementById("tab-ai").classList.remove("hidden");
+  const chat = document.getElementById("chat");
+  const add = (cls, text) => { const d = document.createElement("div"); d.className = "msg " + cls; d.textContent = text; chat.appendChild(d); return d; };
+  document.getElementById("ask").onsubmit = async (e) => {
+    e.preventDefault();
+    const input = document.getElementById("ask-text"), text = input.value.trim();
+    if (!text) return;
+    input.value = ""; add("me", text); const pending = add("bot", "…");
+    try { const r = await api("ask", { method: "POST", body: { text } }); pending.textContent = r.text; if (r.changed) refresh(); }
+    catch (err) { pending.textContent = "Ошибка: " + err.message; }
+  };
+}
+
+document.getElementById("tabs").onclick = (e) => {
+  const tab = e.target.dataset && e.target.dataset.tab; if (!tab) return;
+  document.querySelectorAll(".tab").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
+  ["open", "done", "ai", "settings"].forEach(v => document.getElementById("view-" + v).classList.toggle("hidden", v !== tab));
+};
+
+(async () => {
+  try {
+    me = await api("me");
+  } catch (err) {
+    document.body.innerHTML = `<div class="card empty">${esc(err.message)}</div>`; return;
+  }
+  setupAdd(); setupEditor(); setupSettings(); setupAsk();
+  await refresh();
+  if (openedForTask) {
+    try { openEditor(await api("tasks/" + openedForTask)); } catch (e) { openedForTask = null; }
+  }
+})();
+</script>
+</body>
+</html>

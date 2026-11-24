@@ -1,15 +1,21 @@
-FROM python:3.8
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    tzdata \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-ENV PYTHONDONTWRITEBYTECODE=1
+FROM python:3.12-slim
 
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
 WORKDIR /app
-COPY requirements.txt favicon.ico .env app.py messages.py telegramcalendar.py config.py handlers.py db.py utils.py scheduler.py ./
-RUN python -m pip install --no-cache-dir --upgrade pip 
-RUN python -m pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt .
+RUN pip install -r requirements.txt
 
-ENTRYPOINT ["python", "app.py"]
+COPY todobot ./todobot
+RUN useradd --create-home --uid 10001 bot && chown -R bot /app
+USER bot
 
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
+  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/healthz').status==200 else 1)"
+
+# Секреты передаются через окружение (env_file / k8s Secret), .env в образ не копируется.
+CMD ["python", "-m", "todobot"]

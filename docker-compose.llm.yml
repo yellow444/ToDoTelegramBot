@@ -1,0 +1,14 @@
+# Подключение к llm-gateway (C:\repos\llm-gateway) по его docker-сети.
+#   docker compose -f docker-compose.yml -f docker-compose.llm.yml up -d --build
+services:
+  todobot:
+    environment:
+      LLM_BASE_URL: http://llmgw-gateway:8080/v1
+    networks:
+      - default
+      - llm-net
+
+networks:
+  llm-net:
+    external: true
+    name: llm-gateway_llm-net

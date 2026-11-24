@@ -1,0 +1,9 @@
+[mcp_servers.thunderbird]
+command = "node"
+args = ["C:/tools/thunderbird-mcp/mcp-bridge.cjs"]
+startup_timeout_sec = 30
+
+[mcp_servers.todo]
+# один общий MCP-сервер внутри бота (HTTP), а не процесс на каждую сессию
+url = "http://localhost:8088/mcp"
+startup_timeout_sec = 30

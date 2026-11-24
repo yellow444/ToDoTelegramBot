@@ -1,0 +1,13 @@
+.env
+.venv
+.git
+.claude
+.pytest_cache
+__pycache__
+mongo-data
+certbot
+tests
+*.gif
+k8s
+data
+agent-context

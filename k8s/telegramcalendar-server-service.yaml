@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: telegramcalendar-server
+  namespace: telegramcalendar
+spec:
+  selector:
+    io.kompose.service: telegramcalendar-server
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

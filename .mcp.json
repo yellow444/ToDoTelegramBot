@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "thunderbird": {
+      "command": "node",
+      "args": [
+        "C:/tools/thunderbird-mcp/mcp-bridge.cjs"
+      ]
+    },
+    "todo": {
+      "type": "http",
+      "url": "http://localhost:8088/mcp"
+    }
+  }
+}

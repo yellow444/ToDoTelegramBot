@@ -1,19 +1,45 @@
-version: "3.8"
-
 services:
-  todotelegrambot:
-    image: todotelegrambot
-    build:
-      context: .
-      dockerfile: ./Dockerfile
-    command: [ "pwd" ]
+  todobot:
+    image: yellow444/telegramcalendarserver:latest
+    build: .
+    container_name: todobot
+    restart: unless-stopped
+    cpu_shares: 4096  # на машине много тяжёлых контейнеров; боту процессор нужен редко, но сразу
+    env_file: .env
+    environment:
+      MONGO_URI: mongodb://${MONGO_USER:-root}:${MONGO_PASS:-change-me}@mongodb:27017/?authSource=admin
+      HF_HOME: /app/data/hf  # кэш моделей whisper
+      FILES_DIR: /app/data/files
+      TG_SESSION: /app/data/userbot.session
     volumes:
-      - ./app.py:/app/app.py
-      - ./.env:/app/.env
+      - ./data:/app/data
+    ports:
+      # Mini App и /mcp; наружу публикуйте через nginx (https)
+      - "127.0.0.1:8088:8080"
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
+
+  mongodb:
+    image: mongo:7
+    container_name: mongodb
+    restart: unless-stopped
+    cpu_shares: 4096
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS:-change-me}
+    volumes:
+      - ./mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
   webservercert:
     image: nginx:latest
+    profiles: ["web"]
     ports:
       - 80:80
     restart: always
@@ -22,8 +48,10 @@ services:
       - ./certbot/www/:/etc/nginx/html/:ro
       - ./certbot/www:/var/www/certbot/:ro
       - ./certbot/conf/:/etc/nginx/ssl/:ro
+
   webserver:
     image: nginx:latest
+    profiles: ["web"]
     ports:
       - 443:443
     restart: always
@@ -31,26 +59,15 @@ services:
       - ./nginx/conf/:/etc/nginx/conf.d/:rw
       - ./certbot/conf/:/etc/nginx/ssl/:ro
       - ./datawww/:/etc/nginx/html/
+    depends_on:
+      - todobot
+
   certbot:
     image: certbot/certbot:latest
+    profiles: ["cert"]
     env_file:
       - .env
     command: certonly --webroot --email user@example.com --webroot-path /var/www/certbot/ --non-interactive --agree-tos -d ${DOMAIN_NAME}
-    # --dry-run
     volumes:
       - ./certbot/www/:/var/www/certbot/:rw
       - ./certbot/conf/:/etc/letsencrypt/:rw
-
-  mongodb:
-    image: mongo:latest
-    container_name: "mongodb"
-    restart: always
-    # command: mongod --auth
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: change-me
-      MONGO_INITDB_DATABASE: admin
-    ports:
-      - 27017:27017
-    volumes:
-      - ./mongo-data:/data/db

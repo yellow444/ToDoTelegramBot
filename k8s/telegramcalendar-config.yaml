@@ -7,10 +7,14 @@ data:
   MYHOSTNAME: 'https://todo.example.com'
   SSL_CERT: '/app/ssl/live/todo.example.com/fullchain.pem'
   SSL_KEY: '/app/ssl/live/todo.example.com/privkey.pem'
-  PORT: '80'
+  WEB_PORT: '8080'
   MONGO_HOST: 'mongodb'
   MONGO_PORT: '27017'
   DB_NAME: 'teleg'
   COLLECTION_NAME: 'collection'
   MONGO_URI: 'mongodb://root:change-me@mongodb.telegramcalendar.svc.cluster.local:27017/teleg?authSource=admin'
   TZ: "Europe/Moscow"
+  # Mini App (https, со слешем на конце) и LLM — по желанию
+  WEBAPP_URL: ''
+  LLM_BASE_URL: ''
+  LLM_MODEL: 'general35'
